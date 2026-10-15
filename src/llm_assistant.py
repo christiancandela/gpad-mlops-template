@@ -220,7 +220,11 @@ def guardrails(text: str, case: dict, max_words: int, forbidden_values: list[str
     porcentajes = [int(round(float(p.replace(",", ".")))) for p in re.findall(r"(\d+(?:[.,]\d+)?)\s*%", text)]
     if case["probability_pct"] not in porcentajes:
         violaciones.append("no_menciona_probabilidad")
-    if any(abs(p - case["probability_pct"]) > 1 for p in porcentajes):
+    # Cifras permitidas: la probabilidad, el umbral y el efecto de cada factor (±1 por redondeo).
+    permitidas = [case["probability_pct"], case["threshold_pct"]] + [
+        abs(f["delta_pp"]) for f in case["factors"]
+    ]
+    if any(min(abs(p - q) for q in permitidas) > 1 for p in porcentajes):
         violaciones.append("cifra_inventada")
     palabras_clave = {w for f in case["factors"] for w in re.findall(r"\w{5,}", f["label"].lower())}
     if not any(w in text.lower() for w in palabras_clave):
@@ -254,6 +258,7 @@ class Explanation:
     text: str
     used_fallback: bool
     violations: list = field(default_factory=list)
+    llm_text: str = ""  # respuesta original del LLM (para la revisión humana)
     provider: str = ""
     model: str = ""
     prompt_version: str = ""
@@ -295,6 +300,7 @@ def explain(case: dict, params: dict, provider: str | None = None) -> Explanatio
         text=fallback_text(case) if used_fallback else gen.text,
         used_fallback=used_fallback,
         violations=violations,
+        llm_text=gen.text,
         provider=provider,
         model=gen.model,
         prompt_version=cfg["prompt_version"],
