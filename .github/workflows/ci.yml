@@ -23,11 +23,12 @@ jobs:
     name: Pruebas, pipeline y quality gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # necesario para comparar métricas con la rama base
 
-      - uses: astral-sh/setup-uv@v6
+      # setup-uv no publica etiquetas de versión mayor desde la v8: se fija la versión completa.
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
 
@@ -78,7 +79,7 @@ jobs:
 
       - name: Publicar resultados
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: resultados-modelo
           path: |
@@ -92,10 +93,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: pipeline
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Descargar el modelo entrenado en el job anterior
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: resultados-modelo
           path: .
