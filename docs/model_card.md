@@ -14,5 +14,6 @@
 | **Equidad** | `recall_gap_senior_citizen` (brecha de recall entre grupos); discutir causas y mitigación |
 | **Explicabilidad** | Coeficientes del modelo / SHAP (extensión) |
 | **Limitaciones** | Datos sintéticos en la plantilla; desempeño sensible a cambios de tarifas (ver escenario `precios`) |
+| **Asistente LLM** | Explicaciones en lenguaje natural para el agente (`docs/asistente_llm.md`): proveedor, versión del prompt y resultado de `reports/llm_eval.json` |
 | **Monitoreo** | `monitoring/drift_report.py`; umbrales en `params.yaml` y `docs/runbook.md` |
 | **Consideraciones éticas** | Riesgo de trato diferencial por edad (senior_citizen); transparencia ante el cliente |

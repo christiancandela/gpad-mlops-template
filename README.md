@@ -17,6 +17,7 @@ Cada equipo reemplaza la ingesta y el contrato por los de su caso.
 | Integración continua | **GitHub Actions** (+ release a GHCR opcional) | `.github/workflows/` |
 | Servicio | **FastAPI** + **Docker** | `app/`, `Dockerfile` |
 | Monitoreo | **Evidently** (drift), **Prometheus** + **Grafana** (operación) | `monitoring/`, `docker-compose.yml` |
+| Asistente de explicación (LLMOps) | **Ollama** (local) o **Claude API**, prompt versionado, guardrails y evaluación | `src/llm_assistant.py`, `src/llm_eval.py`, `prompts/` |
 | Documentación de gestión | Charter, gobernanza, model card, runbook, decisiones, post-mortem | `docs/` |
 
 ---
@@ -30,7 +31,7 @@ git clone <url-de-su-repositorio> && cd <repositorio>
 uv sync                                   # crea .venv con Python 3.12 y las versiones exactas de uv.lock
 uv run dvc repro                          # ingest → validate → prepare → train → evaluate
 uv run python -m scripts.promote          # quality gate y promoción a @champion
-uv run pytest                             # 21 pruebas
+uv run pytest                             # 29 pruebas
 ```
 
 > ¿Sin uv? `python -m venv .venv`, active el entorno, `pip install -r requirements.txt` y ejecute los
@@ -149,7 +150,29 @@ uv run python -m src.explain                                 # importancia por p
 
 Resultados en `reports/business/`, `reports/fairness/` y `reports/explain/`: cítelos en `docs/model_card.md`.
 
-## 8. Cómo adaptar la plantilla a su caso
+## 8. Asistente de explicación con LLM (Entrega 4)
+
+Convierte cada predicción en una explicación en lenguaje natural para quien toma la decisión,
+con prompt versionado, guardrails, respaldo determinista y evaluación con *quality gate*.
+Detalle y riesgos: [`docs/asistente_llm.md`](docs/asistente_llm.md).
+
+```bash
+uv run python -m src.llm_assistant --row 0                     # una explicación (proveedor de params.yaml)
+uv run python -m src.llm_eval                                   # evaluación + gate + registro en MLflow
+uv run python -m src.llm_eval --provider ollama                 # LLM local (ollama pull qwen3:4b)
+uv run python -m src.llm_eval --provider anthropic              # Claude API (requiere ANTHROPIC_API_KEY)
+```
+
+| Proveedor | Uso | Costo |
+|---|---|---|
+| `mock` | CI, pruebas y clase sin red (respuesta determinista) | 0 |
+| `ollama` | LLM local: los datos no salen del computador | 0 (cómputo propio) |
+| `anthropic` | Claude API (`claude-opus-5-5`) | por tokens (`price_per_mtok` en `params.yaml`) |
+
+> La clave de API se lee de la variable de entorno `ANTHROPIC_API_KEY`: **nunca** la escriba en el código,
+> en `params.yaml` ni en un *commit* (`.env` está en `.gitignore`).
+
+## 9. Cómo adaptar la plantilla a su caso
 
 1. **Ingesta** – reemplace `src/ingest.py` (descarga del dataset) o use `dvc add data/raw/<archivo>` y elimine la etapa `ingest` de `dvc.yaml`. Configure un remoto: `uv run dvc remote add -d storage <ruta-o-url>` y `uv run dvc push`.
 2. **Columnas** – actualice `src/common.py` (`TARGET`, `NUMERIC_FEATURES`, `CATEGORICAL_FEATURES`, `CATEGORIES`).
@@ -158,9 +181,10 @@ Resultados en `reports/business/`, `reports/fairness/` y `reports/explain/`: cí
 5. **Métricas, umbrales e impacto** – `params.yaml` (`gate`, `business`) y `src/evaluate.py` (regresión/pronóstico: cambie las métricas y use partición temporal en `src/prepare.py`).
 6. **Pruebas de comportamiento** – reescriba `tests/test_model_behavior.py` con las expectativas de su negocio.
 7. **Monitoreo** – adapte los escenarios de `src/synthetic.py` o use lotes reales en `data/production/`.
-8. **Documentación** – complete `docs/` en cada entrega y marque el repositorio con los tags `e1` … `e4`.
+8. **Asistente LLM** – adapte `FEATURE_LABELS` en `src/llm_assistant.py`, el prompt en `prompts/` y `llm.exclude` en `params.yaml`.
+9. **Documentación** – complete `docs/` en cada entrega y marque el repositorio con los tags `e1` … `e4`.
 
-## 9. Estructura
+## 10. Estructura
 
 ```
 ├── app/                    API FastAPI
@@ -168,6 +192,7 @@ Resultados en `reports/business/`, `reports/fairness/` y `reports/explain/`: cí
 ├── data/                   raw/ y processed/ (DVC) · production/ (lotes y log de predicciones)
 ├── docs/                   charter, gobernanza, model card, runbook, decisiones, post-mortem
 ├── models/                 model.joblib (DVC) + model_meta.json (trazabilidad)
+├── prompts/                prompts versionados del asistente LLM
 ├── monitoring/             drift (Evidently), lotes simulados, tráfico, Prometheus, Grafana, MLflow server
 ├── reports/                validación, curva ROC, matriz de confusión, gate, drift
 ├── scripts/                quality gate, promoción y rollback
