@@ -1,0 +1,45 @@
+# Parámetros del pipeline. Todo cambio aquí es una decisión versionada:
+# DVC detecta qué etapas deben re-ejecutarse y MLflow registra los valores en cada corrida.
+
+data:
+  n_rows: 7000          # tamaño del dataset sintético (reemplazar por la ingesta del caso real)
+  seed: 42
+
+split:
+  test_size: 0.2
+  seed: 42
+
+model:
+  type: logistic_regression   # logistic_regression | random_forest | gradient_boosting
+  decision_threshold: 0.35    # probabilidad a partir de la cual se predice churn = 1
+  logistic_regression:
+    C: 1.0
+    max_iter: 1000
+  random_forest:
+    n_estimators: 300
+    max_depth: 8
+    min_samples_leaf: 5
+  gradient_boosting:
+    n_estimators: 200
+    learning_rate: 0.05
+    max_depth: 3
+
+# Supuestos para estimar el impacto de negocio (KPI de negocio "estimado").
+business:
+  customer_value: 600.0        # valor de un cliente retenido (USD)
+  contact_cost: 25.0           # costo de contactar a un cliente en la campaña
+  retention_success_rate: 0.30 # proporción de clientes en riesgo que se retienen al contactarlos
+
+mlflow:
+  experiment: gpad-churn
+  registered_model: gpad-churn-model
+
+# Quality gate: condiciones mínimas para promover un modelo de @challenger a @champion.
+gate:
+  min_roc_auc: 0.75
+  min_recall: 0.70
+  min_precision: 0.45
+  max_drop_vs_champion: 0.01   # caída máxima de ROC-AUC tolerada frente al @champion actual
+
+monitoring:
+  drift_share_threshold: 0.25  # proporción de columnas con drift que dispara la alerta

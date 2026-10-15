@@ -1,0 +1,19 @@
+# Entorno
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.DS_Store
+
+# MLflow local (cada integrante tiene su propio registro; use el servidor compartido para colaborar)
+mlflow.db
+mlruns/
+mlartifacts/
+
+# Datos de producción simulados y reportes de monitoreo (se regeneran)
+data/production/*
+!data/production/.gitkeep
+reports/drift/
+reports/gate.json

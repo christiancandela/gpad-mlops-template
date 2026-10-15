@@ -1,0 +1,50 @@
+# (Extensión opcional) Entrega continua: al crear un tag de versión (ej. `git tag v1.0.0 && git push --tags`)
+# se reentrena con el pipeline versionado, se valida y se publica la imagen en GitHub Container Registry:
+#   ghcr.io/<usuario>/<repositorio>:<tag>
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Pipeline y quality gate
+        run: |
+          uv sync --frozen
+          uv run dvc repro
+          uv run python -m scripts.quality_gate
+          uv run pytest
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

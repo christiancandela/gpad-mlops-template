@@ -1,0 +1,52 @@
+# Stack local de operación del modelo:
+#   api        → http://localhost:8000/docs   (FastAPI, modelo @champion empaquetado)
+#   mlflow     → http://localhost:5001        (tracking + registro de modelos compartido;
+#                                             5001 porque en macOS el 5000 lo usa AirPlay)
+#   prometheus → http://localhost:9090        (recolecta /metrics de la API)
+#   grafana    → http://localhost:3000        (tablero "GPAD – Operación del modelo", usuario admin / admin)
+#
+# Requisito: haber ejecutado `dvc repro` para que exista models/model.joblib.
+# Uso: docker compose up -d --build     ·     docker compose down
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      PREDICTION_LOG: /app/logs/predictions.csv
+    volumes:
+      - ./data/production:/app/logs
+
+  mlflow:
+    build: monitoring/mlflow
+    ports:
+      - "5001:5000"
+    volumes:
+      - mlflow-data:/mlflow
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:12.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/gpad-api.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  mlflow-data:

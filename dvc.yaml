@@ -1,0 +1,70 @@
+stages:
+  ingest:
+    cmd: python -m src.ingest
+    deps:
+      - src/ingest.py
+      - src/synthetic.py
+    params:
+      - data
+    outs:
+      - data/raw/churn.csv
+
+  validate:
+    cmd: python -m src.validate
+    deps:
+      - data/raw/churn.csv
+      - contracts/churn_contract.py
+      - src/validate.py
+    outs:
+      - reports/validation.json:
+          cache: false
+
+  prepare:
+    cmd: python -m src.prepare
+    deps:
+      - data/raw/churn.csv
+      - reports/validation.json
+      - src/prepare.py
+    params:
+      - split
+    outs:
+      - data/processed/train.csv
+      - data/processed/test.csv
+
+  train:
+    cmd: python -m src.train
+    deps:
+      - data/processed/train.csv
+      - src/features.py
+      - src/train.py
+    params:
+      - model
+      - mlflow
+    outs:
+      - models/model.joblib
+      - models/model_meta.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m src.evaluate
+    deps:
+      - data/processed/test.csv
+      - models/model.joblib
+      # model_meta.json cambia en cada entrenamiento (nueva corrida de MLflow): así la evaluación
+      # siempre registra sus métricas en esa corrida, aunque el modelo resulte idéntico.
+      - models/model_meta.json
+      - src/evaluate.py
+    params:
+      - business
+      - model.decision_threshold
+    metrics:
+      - metrics.json:
+          cache: false
+    plots:
+      - reports/roc_curve.csv:
+          x: fpr
+          y: tpr
+          cache: false
+    outs:
+      - reports/confusion_matrix.png:
+          cache: false

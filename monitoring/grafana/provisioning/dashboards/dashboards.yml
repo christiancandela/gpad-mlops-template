@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: gpad
+    folder: GPAD
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

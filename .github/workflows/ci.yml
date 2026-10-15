@@ -1,0 +1,119 @@
+# Integración continua del proyecto: cada push y cada pull request deben pasar por aquí.
+#   1. Lint + pruebas unitarias y de contrato de datos
+#   2. Pipeline completo (dvc repro) → métricas
+#   3. Quality gate (umbrales de params.yaml)
+#   4. Pruebas de comportamiento del modelo y de la API
+#   5. Construcción de la imagen Docker y prueba de humo de la API
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+
+jobs:
+  pipeline:
+    name: Pruebas, pipeline y quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # necesario para comparar métricas con la rama base
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Instalar dependencias (versiones exactas de uv.lock)
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Pruebas unitarias y de contrato de datos
+        run: uv run pytest -m "not model"
+
+      # Si sus datos están en un remoto DVC, agregue antes: `uv run dvc pull` con las credenciales
+      # guardadas como secretos del repositorio.
+      - name: Pipeline reproducible (dvc repro)
+        run: uv run dvc repro
+
+      - name: Métricas
+        run: |
+          uv run dvc metrics show
+          {
+            echo "## Métricas del modelo"
+            uv run dvc metrics show --md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comparar métricas con la rama base
+        if: github.event_name == 'pull_request'
+        run: |
+          {
+            echo "## Cambio de métricas vs ${{ github.base_ref }}"
+            uv run dvc metrics diff "origin/${{ github.base_ref }}" --md
+            echo "## Cambio de parámetros"
+            uv run dvc params diff "origin/${{ github.base_ref }}" --md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # En CI el registro de MLflow es temporal (no hay @champion previo):
+      # el gate solo aplica los umbrales absolutos de params.yaml.
+      - name: Quality gate
+        run: uv run python -m scripts.quality_gate
+
+      - name: Pruebas de comportamiento del modelo y de la API
+        run: uv run pytest -m model
+
+      - name: Monitoreo (prueba de humo sin drift)
+        run: |
+          uv run python -m monitoring.make_production_batch --scenario normal
+          uv run python -m monitoring.drift_report data/production/batch_normal.csv
+
+      - name: Publicar resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-modelo
+          path: |
+            metrics.json
+            reports/
+            models/
+          if-no-files-found: ignore
+
+  docker:
+    name: Imagen Docker y prueba de humo
+    runs-on: ubuntu-latest
+    needs: pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descargar el modelo entrenado en el job anterior
+        uses: actions/download-artifact@v4
+        with:
+          name: resultados-modelo
+          path: .
+
+      - name: Construir imagen
+        run: docker build -t churn-api:${{ github.sha }} .
+
+      - name: Prueba de humo
+        run: |
+          docker run -d --name api -p 8000:8000 churn-api:${{ github.sha }}
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && break
+            sleep 1
+          done
+          curl -sf -X POST http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{"customers":[{"tenure_months":3,"contract_type":"month-to-month","internet_service":"fiber","payment_method":"electronic_check","monthly_charges":95.5,"support_tickets":4,"senior_citizen":0}]}'
+
+      - name: Logs de la API
+        if: failure()
+        run: docker logs api

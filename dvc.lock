@@ -1,0 +1,154 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: python -m src.ingest
+    deps:
+    - path: src/ingest.py
+      hash: md5
+      md5: 6f5d64f6629efe5e8410eb7c342dd5c4
+      size: 866
+    - path: src/synthetic.py
+      hash: md5
+      md5: a3948b69f08768eab16f46d81bcc23da
+      size: 3666
+    params:
+      params.yaml:
+        data:
+          n_rows: 7000
+          seed: 42
+    outs:
+    - path: data/raw/churn.csv
+      hash: md5
+      md5: 0a6b1c74a00c5be89687cefb8735196b
+      size: 416141
+  validate:
+    cmd: python -m src.validate
+    deps:
+    - path: contracts/churn_contract.py
+      hash: md5
+      md5: 930055f968ec7e209e5b46569c925771
+      size: 1667
+    - path: data/raw/churn.csv
+      hash: md5
+      md5: 0a6b1c74a00c5be89687cefb8735196b
+      size: 416141
+    - path: src/validate.py
+      hash: md5
+      md5: 11c326d958cee7a75de2a470452d78cc
+      size: 1399
+    outs:
+    - path: reports/validation.json
+      hash: md5
+      md5: 57dffa84d1529e045f17722550f93403
+      size: 59
+  prepare:
+    cmd: python -m src.prepare
+    deps:
+    - path: data/raw/churn.csv
+      hash: md5
+      md5: 0a6b1c74a00c5be89687cefb8735196b
+      size: 416141
+    - path: reports/validation.json
+      hash: md5
+      md5: 57dffa84d1529e045f17722550f93403
+      size: 59
+    - path: src/prepare.py
+      hash: md5
+      md5: bca90892c9a18843f091b75af1dc1bb4
+      size: 970
+    params:
+      params.yaml:
+        split:
+          test_size: 0.2
+          seed: 42
+    outs:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: bfae2895bb2d8ef0857655c1874928ac
+      size: 83231
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 0b5bf10ac809c863b481e88d12a7b217
+      size: 333035
+  train:
+    cmd: python -m src.train
+    deps:
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 0b5bf10ac809c863b481e88d12a7b217
+      size: 333035
+    - path: src/features.py
+      hash: md5
+      md5: 6bfe0ad3060206bc77db535636592c62
+      size: 1851
+    - path: src/train.py
+      hash: md5
+      md5: 80cd6749339b9e838672551b68681f0f
+      size: 2798
+    params:
+      params.yaml:
+        mlflow:
+          experiment: gpad-churn
+          registered_model: gpad-churn-model
+        model:
+          type: logistic_regression
+          decision_threshold: 0.35
+          logistic_regression:
+            C: 1.0
+            max_iter: 1000
+          random_forest:
+            n_estimators: 300
+            max_depth: 8
+            min_samples_leaf: 5
+          gradient_boosting:
+            n_estimators: 200
+            learning_rate: 0.05
+            max_depth: 3
+    outs:
+    - path: models/model.joblib
+      hash: md5
+      md5: b601e0bdb4202f2cb0bc0e38e27c788d
+      size: 4257
+    - path: models/model_meta.json
+      hash: md5
+      md5: 9c4dce88b6190e130aaf9bd334c80403
+      size: 280
+  evaluate:
+    cmd: python -m src.evaluate
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: bfae2895bb2d8ef0857655c1874928ac
+      size: 83231
+    - path: models/model.joblib
+      hash: md5
+      md5: b601e0bdb4202f2cb0bc0e38e27c788d
+      size: 4257
+    - path: models/model_meta.json
+      hash: md5
+      md5: 9c4dce88b6190e130aaf9bd334c80403
+      size: 280
+    - path: src/evaluate.py
+      hash: md5
+      md5: f72537094cea263be3b13ce6a1f76c4a
+      size: 3574
+    params:
+      params.yaml:
+        business:
+          customer_value: 600.0
+          contact_cost: 25.0
+          retention_success_rate: 0.3
+        model.decision_threshold: 0.35
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: 5cef6e6d0d29d26b128c30ae580c18e3
+      size: 273
+    - path: reports/confusion_matrix.png
+      hash: md5
+      md5: 58b7cd53c07e179d647ffe6dcbd369cd
+      size: 24350
+    - path: reports/roc_curve.csv
+      hash: md5
+      md5: d97de85342417eab4028e9bb7a587e84
+      size: 14893
