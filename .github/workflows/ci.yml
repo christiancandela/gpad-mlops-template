@@ -27,7 +27,8 @@ jobs:
         with:
           fetch-depth: 0   # necesario para comparar métricas con la rama base
 
-      - uses: astral-sh/setup-uv@v10
+      # setup-uv no publica etiquetas de versión mayor desde la v8: se fija la versión completa.
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
 
