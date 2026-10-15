@@ -72,6 +72,11 @@ jobs:
       - name: Pruebas de comportamiento del modelo y de la API
         run: uv run pytest -m model
 
+      # Asistente LLM con el proveedor mock (sin red ni credenciales): verifica el prompt,
+      # los guardrails y el respaldo. Las evaluaciones con un LLM real se hacen localmente.
+      - name: Asistente LLM (evaluación con mock)
+        run: uv run python -m src.llm_eval --provider mock --no-mlflow
+
       - name: Monitoreo (prueba de humo sin drift)
         run: |
           uv run python -m monitoring.make_production_batch --scenario normal

@@ -24,6 +24,11 @@ ml = [
     "evidently>=0.7",
     "matplotlib>=3.8",
 ]
+# Asistente de explicación con LLM (taller LLMOps, S7): SDK oficial de Claude.
+# Ollama (modelo local) se usa por HTTP y no requiere paquete adicional.
+llm = [
+    "anthropic>=1.0",
+]
 dev = [
     "pytest>=8.0",
     "httpx2>=2.13",
@@ -33,7 +38,7 @@ dev = [
 
 [tool.uv]
 package = false
-default-groups = ["ml", "dev"]
+default-groups = ["ml", "llm", "dev"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

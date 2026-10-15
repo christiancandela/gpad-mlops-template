@@ -43,3 +43,25 @@ gate:
 
 monitoring:
   drift_share_threshold: 0.25  # proporción de columnas con drift que dispara la alerta
+
+# Asistente de explicación con LLM (Entrega 4). Ver docs/asistente_llm.md.
+llm:
+  provider: mock              # mock (sin LLM, para CI y pruebas) | ollama (local) | anthropic (Claude API)
+  model:
+    ollama: qwen3:4b          # modelo local pequeño; verifique con `ollama pull <modelo>`
+    anthropic: claude-opus-5-5
+  prompt_version: v1          # archivo prompts/explicacion_<version>.md
+  top_factors: 3              # factores que se entregan al LLM
+  exclude: [senior_citizen]  # variables que el asistente nunca menciona (atributo sensible)
+  max_words: 90               # longitud máxima de la explicación (guardrail)
+  eval_cases: 15              # casos de evaluación (muestra fija de test.csv, semilla 42)
+  # Precios por millón de tokens para estimar costos (USD). Actualícelos según el proveedor.
+  price_per_mtok:
+    anthropic: {input: 4.0, output: 20.0}
+    ollama: {input: 0.0, output: 0.0}
+    mock: {input: 0.0, output: 0.0}
+
+# Criterios mínimos para aprobar una versión del prompt (quality gate del asistente).
+llm_gate:
+  min_guardrail_pass_rate: 0.90   # explicaciones que pasan todos los controles sin usar el respaldo
+  max_p95_latency_s: 20.0
